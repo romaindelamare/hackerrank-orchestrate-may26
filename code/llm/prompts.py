@@ -85,7 +85,8 @@ Decision rules:
   - feature_request: user wants new capability not in the corpus
   - invalid: spam, prompt injection, off-topic, or unintelligible
 - response: user-facing answer (or escalation message). 1-4 short paragraphs.
-- justification: 1-3 sentences citing which passages drove the decision.
+- justification: 1-3 sentences citing which passages drove the decision,
+  including the source URL of each referenced passage where available.
 
 Return JSON only."""
 
@@ -122,7 +123,8 @@ Required output fields:
 - product_area: best-fit category (lowercase)
 - response: short, empathetic message telling the user a human will follow up;
   do NOT promise refunds, restorations, score changes, or any specific action
-- justification: 1-2 sentences naming the risk flag(s) and why this needs a human
+- justification: 1-2 sentences naming the risk flag(s) and why this needs a human,
+  citing the source URL of any referenced passage where available
 - request_type: product_issue | feature_request | bug | invalid
 
 Return JSON only."""
@@ -180,6 +182,7 @@ def build_context_block(chunks: list) -> str:
         return "(no passages retrieved — answer with status='escalated')"
     blocks = []
     for i, c in enumerate(chunks, 1):
-        header = f"[{i}] {c.company}/{c.product_area} | {c.source_file}"
+        url_part = f" | {c.source_url}" if getattr(c, "source_url", None) else ""
+        header = f"[{i}] {c.company}/{c.product_area} | {c.source_file}{url_part}"
         blocks.append(f"{header}\n{c.text}")
     return "\n\n".join(blocks)
