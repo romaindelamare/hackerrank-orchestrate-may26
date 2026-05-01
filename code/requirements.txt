@@ -1,0 +1,8 @@
+mistralai==2.4.4
+langgraph==0.3.5
+chromadb==0.6.3
+sentence-transformers==3.4.1
+pydantic==2.11.3
+python-dotenv==1.0.1
+pandas==2.2.3
+PyYAML==6.0.2

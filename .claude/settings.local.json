@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($now = Get-Date; $end = [datetime]::Parse\\(\"2026-05-02T11:00:00+05:30\"\\); $remaining = $end - $now; \"Now: $\\($now.ToString\\('o'\\)\\)\"; \"TZ: $\\([TimeZoneInfo]::Local.Id\\)\"; \"Remaining: $\\([int]$remaining.TotalDays\\)d $\\($remaining.Hours\\)h $\\($remaining.Minutes\\)m\")"
+    ]
+  }
+}
