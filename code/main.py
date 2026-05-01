@@ -40,6 +40,7 @@ def _suppress_chroma_stderr():
     finally:
         sys.stderr = old_stderr
 
+from code.cache.semantic_cache import SemanticCache
 from code.config import (
     CODE_DIR,
     INPUT_CSV,
@@ -218,6 +219,7 @@ def main() -> int:
         llm = MistralClient()
         retriever = ChromaRetriever()
         graph = build_graph(llm, retriever)
+        cache = SemanticCache()
 
         df = pd.read_csv(args.input)
         if args.limit:
@@ -225,6 +227,7 @@ def main() -> int:
 
         rows: list[dict] = []
         total = len(df)
+        cache_hits = 0
         status_counter: Counter[str] = Counter()
         request_type_counter: Counter[str] = Counter()
         company_counter: Counter[str] = Counter()
@@ -233,16 +236,33 @@ def main() -> int:
         for i, row in df.iterrows():
             idx = int(i) + 1 if isinstance(i, int) else len(rows) + 1
             state_in = _row_to_state(row)
-            try:
-                state_out = graph.invoke(state_in)
-            except Exception as err:
-                state_out = {
-                    "status": "escalated",
-                    "product_area": "general",
-                    "response": "Unable to process ticket automatically; human follow-up required.",
-                    "justification": f"Graph failure: {err}",
-                    "request_type": "invalid",
-                }
+            ticket_text = f"{state_in['issue']} | {state_in['subject']} | {state_in['company']}"
+
+            cached = cache.get(ticket_text)
+            if cached is not None:
+                state_out = cached
+                cache_hits += 1
+                hit_label = "[CACHE HIT] "
+            else:
+                try:
+                    state_out = graph.invoke(state_in)
+                except Exception as err:
+                    state_out = {
+                        "status": "escalated",
+                        "product_area": "general",
+                        "response": "Unable to process ticket automatically; human follow-up required.",
+                        "justification": f"Graph failure: {err}",
+                        "request_type": "invalid",
+                    }
+                cache.set(ticket_text, {
+                    "status": state_out.get("status", "escalated"),
+                    "product_area": state_out.get("product_area", "general"),
+                    "response": state_out.get("response", ""),
+                    "justification": state_out.get("justification", ""),
+                    "request_type": state_out.get("request_type", "invalid"),
+                })
+                hit_label = ""
+
             status = state_out.get("status", "escalated")
             product_area = state_out.get("product_area", "general")
             request_type = state_out.get("request_type", "invalid")
@@ -263,7 +283,10 @@ def main() -> int:
                 "request_type": request_type,
             })
             # Format: [index/total] status | product_area | company | request_type
-            print(f"  [{idx:2}/{total}] {status:12} | {product_area:35} | {company:18} | {request_type}", flush=True)
+            print(f"  [{idx:2}/{total}] {hit_label}{status:12} | {product_area:35} | {company:18} | {request_type}", flush=True)
+
+        if cache_hits:
+            print(f"[cache] {cache_hits}/{total} ticket(s) served from semantic cache", flush=True)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     out_df = pd.DataFrame(rows, columns=OUTPUT_COLUMNS)

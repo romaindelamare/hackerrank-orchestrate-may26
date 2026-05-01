@@ -26,6 +26,9 @@ RETRIEVAL_TOP_K: int = 8
 LLM_TEMPERATURE: float = 0.0
 LLM_MAX_RETRIES: int = 2
 
+SEMANTIC_CACHE_COLLECTION: str = "llm_response_cache"
+SEMANTIC_CACHE_THRESHOLD: float = 0.93
+
 VALID_COMPANIES: tuple[str, ...] = ("hackerrank", "claude", "visa")
 
 # Risk flags that force the escalate branch regardless of retrieval quality.
