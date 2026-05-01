@@ -51,6 +51,22 @@ class TicketOutput(BaseModel):
     )
 
 
+class ReviewOutput(BaseModel):
+    """Output of the reviewer agent pass over a triage result."""
+
+    action: Literal["approved", "refined", "escalated"] = Field(
+        ...,
+        description="approved=no changes needed; refined=response improved; escalated=safety issue found.",
+    )
+    response: str = Field(..., description="Final user-facing response (may be unchanged).")
+    justification: str = Field(..., description="Final justification (may be unchanged).")
+    status: Status = Field(..., description="Final status after review.")
+    notes: str = Field(
+        ...,
+        description="Brief explanation of what was changed or why it was approved as-is.",
+    )
+
+
 class Chunk(BaseModel):
     """A retrievable section of a corpus document."""
 

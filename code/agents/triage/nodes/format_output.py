@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pydantic import ValidationError
 
-from code.nodes.base import Node
+from code.agents.triage.nodes.base import Node
 from code.schemas.state import TicketState
 from code.schemas.ticket import TicketOutput
 

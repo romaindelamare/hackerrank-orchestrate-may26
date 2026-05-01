@@ -16,7 +16,7 @@ from __future__ import annotations
 from langgraph.graph import END, START, StateGraph
 
 from code.llm.interfaces import ILLMClient
-from code.nodes import (
+from code.agents.triage.nodes import (
     ClassifyNode,
     EscalateNode,
     FormatOutputNode,
@@ -24,7 +24,7 @@ from code.nodes import (
     RetrieveNode,
     triage_router,
 )
-from code.nodes.router import ESCALATE, REPLY
+from code.agents.triage.nodes.router import ESCALATE, REPLY
 from code.retrieval.interfaces import IRetriever
 from code.schemas.state import TicketState
 

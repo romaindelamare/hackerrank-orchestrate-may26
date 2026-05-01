@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "PowerShell($now = Get-Date; $end = [datetime]::Parse\\(\"2026-05-02T11:00:00+05:30\"\\); $remaining = $end - $now; \"Now: $\\($now.ToString\\('o'\\)\\)\"; \"TZ: $\\([TimeZoneInfo]::Local.Id\\)\"; \"Remaining: $\\([int]$remaining.TotalDays\\)d $\\($remaining.Hours\\)h $\\($remaining.Minutes\\)m\")",
-      "Bash(Get-ChildItem -Path \"d:\\\\Dev\\\\AI\\\\hackerrank-orchestrate-may26\\\\code\\\\\" -Recurse | Select-Object FullName)"
+      "Bash(Get-ChildItem -Path \"d:\\\\Dev\\\\AI\\\\hackerrank-orchestrate-may26\\\\code\\\\\" -Recurse | Select-Object FullName)",
+      "Bash(cp d:/Dev/AI/hackerrank-orchestrate-may26/code/graph/builder.py d:/Dev/AI/hackerrank-orchestrate-may26/code/agents/triage/graph.py)",
+      "Bash(cp d:/Dev/AI/hackerrank-orchestrate-may26/code/graph/__init__.py d:/Dev/AI/hackerrank-orchestrate-may26/code/agents/triage/__init__.py)",
+      "Bash(cp -r d:/Dev/AI/hackerrank-orchestrate-may26/code/nodes/* d:/Dev/AI/hackerrank-orchestrate-may26/code/agents/triage/nodes/)",
+      "Bash(python -c \"from code.agents.triage import build_graph; print\\('✓ Import successful'\\)\")",
+      "Bash(python -c \"import code.agents.triage.graph; print\\('✓ Graph module imported successfully'\\)\")",
+      "Bash(python -m py_compile code/main.py)"
     ]
   }
 }

@@ -1,5 +1,5 @@
 """LangGraph compilation."""
 
-from code.graph.builder import build_graph
+from code.agents.triage.graph import build_graph
 
 __all__ = ["build_graph"]

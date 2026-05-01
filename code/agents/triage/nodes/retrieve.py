@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from code.config import RETRIEVAL_TOP_K, VALID_COMPANIES
-from code.nodes.base import Node
+from code.agents.triage.nodes.base import Node
 from code.retrieval.interfaces import IRetriever
 from code.schemas.state import TicketState
 

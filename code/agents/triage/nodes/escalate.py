@@ -8,7 +8,7 @@ from code.llm.prompts import (
     ESCALATE_SYSTEM,
     build_context_block,
 )
-from code.nodes.base import Node
+from code.agents.triage.nodes.base import Node
 from code.schemas.state import TicketState
 from code.schemas.ticket import Chunk, TicketOutput
 

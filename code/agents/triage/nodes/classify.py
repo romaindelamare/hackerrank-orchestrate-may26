@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from code.config import ESCALATE_TRIGGERS, VALID_COMPANIES
 from code.llm.interfaces import ILLMClient
 from code.llm.prompts import CLASSIFY_PROMPT_TEMPLATE, CLASSIFY_SYSTEM
-from code.nodes.base import Node
+from code.agents.triage.nodes.base import Node
 from code.schemas.state import TicketState
 
 

@@ -31,3 +31,7 @@ class TicketState(TypedDict, total=False):
     response: str
     justification: str
     request_type: str
+
+    # ---- Set by reviewer_node (post-triage quality gate) ----------------
+    reviewer_action: str   # "approved" | "refined" | "escalated"
+    reviewer_notes: str    # brief explanation of the review decision

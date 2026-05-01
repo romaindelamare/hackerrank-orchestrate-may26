@@ -47,7 +47,8 @@ from code.config import (
     OUTPUT_CSV,
     REPO_ROOT,
 )
-from code.graph import build_graph
+from code.agents.triage import build_graph
+from code.agents.reviewer import build_reviewer_graph
 from code.llm.mistral_client import MistralClient
 from code.retrieval.indexer import build_index, collection_size
 from code.retrieval.retriever import ChromaRetriever
@@ -67,11 +68,32 @@ OUTPUT_COLUMNS = [
 
 
 def _parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="HackerRank Orchestrate support triage agent")
-    p.add_argument("--reindex", action="store_true", help="Rebuild the vector index")
-    p.add_argument("--limit", type=int, default=None, help="Process only the first N rows")
-    p.add_argument("--input", type=Path, default=INPUT_CSV, help="Input CSV path")
-    p.add_argument("--output", type=Path, default=OUTPUT_CSV, help="Output CSV path")
+    p = argparse.ArgumentParser(
+        description="HackerRank Orchestrate support triage agent",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Examples:\n"
+               "  python -m code.main                         # process all tickets\n"
+               "  python -m code.main --reindex --limit 5     # rebuild index, process 5 tickets\n"
+               "  python -m code.main --reset-cache           # clear semantic cache, then process\n"
+    )
+
+    # Index management
+    index_group = p.add_argument_group("Index Management")
+    index_group.add_argument("--reindex", action="store_true", help="Rebuild the vector index from scratch")
+
+    # Cache management
+    cache_group = p.add_argument_group("Cache Management")
+    cache_group.add_argument("--reset-cache", action="store_true", help="Clear semantic cache before processing")
+
+    # Processing control
+    control_group = p.add_argument_group("Processing Control")
+    control_group.add_argument("--limit", type=int, default=None, help="Process only the first N rows (for debugging)")
+
+    # I/O paths
+    io_group = p.add_argument_group("Input/Output Paths")
+    io_group.add_argument("--input", type=Path, default=INPUT_CSV, help="Input CSV path")
+    io_group.add_argument("--output", type=Path, default=OUTPUT_CSV, help="Output CSV path")
+
     return p.parse_args()
 
 
@@ -104,6 +126,7 @@ def _print_recap(
     status_counts: dict[str, int],
     request_type_counts: dict[str, int],
     company_counts: dict[str, int],
+    reviewer_counts: dict[str, int],
     output_path: Path,
     elapsed_seconds: float,
 ) -> None:
@@ -124,11 +147,11 @@ def _print_recap(
 
     # Color mapping
     status_colors = {
-        "resolved": (GREEN, "✓"),
-        "replied": (GREEN, "✉"),
-        "escalated": (YELLOW, "⚠"),
-        "pending": (BLUE, "⏳"),
-        "closed": (MAGENTA, "🔒"),
+        "resolved": GREEN,
+        "replied": GREEN,
+        "escalated": YELLOW,
+        "pending": BLUE,
+        "closed": MAGENTA,
     }
 
     def build_breakdown(counts: dict[str, int], total_val: int, sort_by_count: bool = False) -> list[str]:
@@ -151,17 +174,17 @@ def _print_recap(
     for status in sorted(status_counts.keys()):
         count = status_counts[status]
         pct = (count / total) * 100
-        color, emoji = status_colors.get(status, (WHITE, "•"))
+        color = status_colors.get(status, WHITE)
         bar_fill = int((count / total) * 15)
         bar = "█" * bar_fill + "░" * (15 - bar_fill)
         status_lines.append(
-            f"  {emoji} {status.capitalize():<18} {color}{bar}{RESET} {count:3} ({pct:5.1f}%)"
+            f"    {status.capitalize():<18} {color}{bar}{RESET} {count:3} ({pct:5.1f}%)"
         )
 
     # Print recap
     print()
     print(f"{CYAN}{border}{RESET}")
-    print(f"{GREEN}{BOLD}✓ PROCESSING COMPLETE{RESET}")
+    print(f"{GREEN}{BOLD}PROCESSING COMPLETE{RESET}")
     print(f"{CYAN}{border}{RESET}")
     print(f"{BOLD}Tickets Processed:{RESET} {WHITE}{total}{RESET}")
     print()
@@ -179,6 +202,20 @@ def _print_recap(
         bar_fill = int((count / total) * 15)
         bar = "█" * bar_fill + "░" * (15 - bar_fill)
         print(f"    {company[:18]:<18} {bar} {count:3} ({pct:5.1f}%)")
+    print()
+    print(f"{BOLD}Reviewer Quality Gate:{RESET}")
+    reviewer_colors = {
+        "approved": GREEN,
+        "refined": BLUE,
+        "escalated": YELLOW,
+    }
+    for action in ["approved", "refined", "escalated"]:
+        count = reviewer_counts.get(action, 0)
+        pct = (count / total) * 100 if total > 0 else 0
+        bar_fill = int((count / total) * 15) if total > 0 else 0
+        bar = "█" * bar_fill + "░" * (15 - bar_fill)
+        color = reviewer_colors.get(action, WHITE)
+        print(f"    {action.capitalize():<18} {color}{bar}{RESET} {count:3} ({pct:5.1f}%)")
     print()
     print(f"{BOLD}Output:{RESET} {CYAN}{output_path.name}{RESET}")
     print(f"{BOLD}Time Taken:{RESET} {WHITE}{elapsed_seconds:.1f}s{RESET}")
@@ -219,7 +256,12 @@ def main() -> int:
         llm = MistralClient()
         retriever = ChromaRetriever()
         graph = build_graph(llm, retriever)
+        reviewer = build_reviewer_graph(llm)
         cache = SemanticCache()
+
+        if args.reset_cache:
+            cache.reset()
+            print("[cache] semantic cache cleared", flush=True)
 
         df = pd.read_csv(args.input)
         if args.limit:
@@ -231,6 +273,7 @@ def main() -> int:
         status_counter: Counter[str] = Counter()
         request_type_counter: Counter[str] = Counter()
         company_counter: Counter[str] = Counter()
+        reviewer_counter: Counter[str] = Counter()
         print(f"[run] processing {total} ticket(s) ...", flush=True)
 
         for i, row in df.iterrows():
@@ -246,6 +289,7 @@ def main() -> int:
             else:
                 try:
                     state_out = graph.invoke(state_in)
+                    state_out = reviewer.invoke(state_out)
                 except Exception as err:
                     state_out = {
                         "status": "escalated",
@@ -253,6 +297,8 @@ def main() -> int:
                         "response": "Unable to process ticket automatically; human follow-up required.",
                         "justification": f"Graph failure: {err}",
                         "request_type": "invalid",
+                        "reviewer_action": "approved",
+                        "reviewer_notes": "Reviewer skipped due to upstream error.",
                     }
                 cache.set(ticket_text, {
                     "status": state_out.get("status", "escalated"),
@@ -260,6 +306,8 @@ def main() -> int:
                     "response": state_out.get("response", ""),
                     "justification": state_out.get("justification", ""),
                     "request_type": state_out.get("request_type", "invalid"),
+                    "reviewer_action": state_out.get("reviewer_action", "approved"),
+                    "reviewer_notes": state_out.get("reviewer_notes", ""),
                 })
                 hit_label = ""
 
@@ -271,6 +319,8 @@ def main() -> int:
             status_counter[status] += 1
             request_type_counter[request_type] += 1
             company_counter[company] += 1
+            reviewer_action = state_out.get("reviewer_action", "approved")
+            reviewer_counter[reviewer_action] += 1
 
             rows.append({
                 "Issue": state_in["issue"],
@@ -282,8 +332,9 @@ def main() -> int:
                 "justification": state_out.get("justification", ""),
                 "request_type": request_type,
             })
-            # Format: [index/total] status | product_area | company | request_type
-            print(f"  [{idx:2}/{total}] {hit_label}{status:12} | {product_area:35} | {company:18} | {request_type}", flush=True)
+            review_tag = "" if reviewer_action == "approved" else f" [{reviewer_action.upper()}]"
+            # Format: [index/total] status | product_area | company | request_type [REVIEWER_ACTION]
+            print(f"  [{idx:2}/{total}] {hit_label}{status:12} | {product_area:35} | {company:18} | {request_type}{review_tag}", flush=True)
 
         if cache_hits:
             print(f"[cache] {cache_hits}/{total} ticket(s) served from semantic cache", flush=True)
@@ -298,6 +349,7 @@ def main() -> int:
         dict(status_counter),
         dict(request_type_counter),
         dict(company_counter),
+        dict(reviewer_counter),
         args.output,
         elapsed,
     )

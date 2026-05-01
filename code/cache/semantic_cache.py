@@ -33,15 +33,18 @@ class SemanticCache:
         threshold: float = SEMANTIC_CACHE_THRESHOLD,
     ) -> None:
         self._threshold = threshold
+        self._collection_name = collection_name
+        self._db_path = db_path
+        self._model_name = model_name
         db_path.mkdir(parents=True, exist_ok=True)
-        client = chromadb.PersistentClient(path=str(db_path))
-        ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+        self._client = chromadb.PersistentClient(path=str(db_path))
+        self._ef = embedding_functions.SentenceTransformerEmbeddingFunction(
             model_name=model_name
         )
         # cosine space so distances map cleanly to 1-dist = similarity
-        self._collection = client.get_or_create_collection(
+        self._collection = self._client.get_or_create_collection(
             name=collection_name,
-            embedding_function=ef,
+            embedding_function=self._ef,
             metadata={"hnsw:space": "cosine"},
         )
 
@@ -67,4 +70,13 @@ class SemanticCache:
             ids=[cache_id],
             documents=[ticket_text],
             metadatas=[{"payload": json.dumps(result_dict)}],
+        )
+
+    def reset(self) -> None:
+        """Clear all cached results by deleting and recreating the collection."""
+        self._client.delete_collection(name=self._collection_name)
+        self._collection = self._client.get_or_create_collection(
+            name=self._collection_name,
+            embedding_function=self._ef,
+            metadata={"hnsw:space": "cosine"},
         )
