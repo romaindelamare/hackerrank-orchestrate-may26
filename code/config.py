@@ -37,23 +37,16 @@ class LLMConfig:
 # Per-node LLM configuration
 # ---------------------------------------------------------------------------
 # Classify: lightweight structured extraction — small/fast model is fine.
-CLASSIFY_LLM = LLMConfig(provider="mistral", model="mistral-small-latest")
+CLASSIFY_LLM  = LLMConfig(provider="mistral",   model="mistral-small-latest")
 
 # Reply: grounded answer generation — benefits from a capable model.
-REPLY_LLM = LLMConfig(provider="mistral", model="mistral-small-latest")
+REPLY_LLM     = LLMConfig(provider="anthropic", model="claude-sonnet-4-6")
 
 # Escalate: empathetic message composition — small model sufficient.
-ESCALATE_LLM = LLMConfig(provider="mistral", model="mistral-small-latest")
+ESCALATE_LLM  = LLMConfig(provider="mistral",   model="mistral-small-latest")
 
 # Reviewer: meta-reasoning quality gate — use a stronger model for better catches.
-REVIEWER_LLM = LLMConfig(provider="mistral", model="mistral-large-latest")
-
-# Optimal configuration
-# CLASSIFY_LLM  = LLMConfig(provider="mistral",   model="mistral-small-latest")
-# REPLY_LLM     = LLMConfig(provider="anthropic", model="claude-sonnet-4-6")
-# ESCALATE_LLM  = LLMConfig(provider="mistral",   model="mistral-small-latest")
-# REVIEWER_LLM  = LLMConfig(provider="anthropic", model="claude-haiku-4-5-20251001")
-
+REVIEWER_LLM  = LLMConfig(provider="anthropic", model="claude-haiku-4-5-20251001")
 
 RETRIEVAL_TOP_K: int = 8
 LLM_TEMPERATURE: float = 0.0
