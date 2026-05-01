@@ -17,6 +17,7 @@ from google.genai import types as genai_types
 from pydantic import BaseModel, ValidationError
 
 from code.config import LLM_MAX_RETRIES, LLM_TEMPERATURE
+from code.llm.backoff import call_with_backoff
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -57,10 +58,13 @@ class GeminiClient:
             max_output_tokens=_DEFAULT_MAX_TOKENS,
             system_instruction=system,
         )
-        response = self._client.models.generate_content(
-            model=self._model,
-            contents=prompt,
-            config=config,
+        response = call_with_backoff(
+            lambda: self._client.models.generate_content(
+                model=self._model,
+                contents=prompt,
+                config=config,
+            ),
+            provider="gemini",
         )
         return response.text or ""
 
@@ -90,10 +94,13 @@ class GeminiClient:
 
         for _ in range(LLM_MAX_RETRIES + 1):
             try:
-                response = self._client.models.generate_content(
-                    model=self._model,
-                    contents=attempt_prompt,
-                    config=config,
+                response = call_with_backoff(
+                    lambda: self._client.models.generate_content(
+                        model=self._model,
+                        contents=attempt_prompt,
+                        config=config,
+                    ),
+                    provider="gemini",
                 )
                 raw = (response.text or "").strip()
                 return schema.model_validate_json(raw)
@@ -130,10 +137,13 @@ class GeminiClient:
                 response_mime_type="application/json",
             )
             try:
-                response = self._client.models.generate_content(
-                    model=self._model,
-                    contents=attempt_prompt,
-                    config=config,
+                response = call_with_backoff(
+                    lambda: self._client.models.generate_content(
+                        model=self._model,
+                        contents=attempt_prompt,
+                        config=config,
+                    ),
+                    provider="gemini",
                 )
                 raw = (response.text or "").strip()
                 if raw.startswith("```"):

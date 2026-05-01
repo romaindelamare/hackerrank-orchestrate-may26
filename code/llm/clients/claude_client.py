@@ -15,6 +15,7 @@ import anthropic
 from pydantic import BaseModel, ValidationError
 
 from code.config import LLM_MAX_RETRIES, LLM_TEMPERATURE
+from code.llm.backoff import call_with_backoff
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -42,7 +43,7 @@ class ClaudeClient:
         )
         if system:
             kwargs["system"] = system
-        response = self._client.messages.create(**kwargs)
+        response = call_with_backoff(lambda: self._client.messages.create(**kwargs), provider="anthropic")
         return response.content[0].text if response.content else ""
 
     # ------------------------------------------------------------ structured
@@ -72,7 +73,7 @@ class ClaudeClient:
                 messages=[{"role": "user", "content": attempt_prompt}],
             )
             try:
-                response = self._client.messages.create(**kwargs)
+                response = call_with_backoff(lambda: self._client.messages.create(**kwargs), provider="anthropic")
                 raw = (response.content[0].text if response.content else "").strip()
                 # Strip accidental markdown fences
                 if raw.startswith("```"):

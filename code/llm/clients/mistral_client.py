@@ -2,27 +2,21 @@
 
 Uses the Mistral SDK v2.x with structured output via JSON mode and JSON schemas.
 We validate output with `model_validate_json` to ensure schema compliance.
-Includes global rate limiter to handle API limits.
 """
 
 from __future__ import annotations
 
 import json
 import os
-import time
 from typing import Type, TypeVar
 
 from mistralai.client import Mistral
 from pydantic import BaseModel, ValidationError
 
 from code.config import LLM_MAX_RETRIES, LLM_TEMPERATURE
+from code.llm.backoff import call_with_backoff
 
 T = TypeVar("T", bound=BaseModel)
-
-# Global rate limiter state: tracks when we hit a rate limit and backs off all subsequent calls
-_rate_limit_backoff_until = 0.0
-_rate_limit_delay = 0.0
-_last_rate_limit_time = 0.0
 
 
 class MistralClient:
@@ -45,50 +39,14 @@ class MistralClient:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
-        return self._call_with_backoff(
+        return call_with_backoff(
             lambda: self._client.chat.complete(
                 model=self._model,
                 messages=messages,
                 temperature=LLM_TEMPERATURE,
-            )
+            ),
+            provider="mistral",
         ).choices[0].message.content or ""
-
-    def _call_with_backoff(self, fn):
-        """Call fn with global rate limiting. On 429, exponentially back off all future calls.
-        Decay backoff after 30s of successful requests."""
-        global _rate_limit_backoff_until, _rate_limit_delay, _last_rate_limit_time
-
-        now = time.time()
-
-        # Decay backoff if we haven't hit a rate limit in 30 seconds
-        if _last_rate_limit_time > 0 and (now - _last_rate_limit_time) > 30:
-            _rate_limit_delay = max(0, _rate_limit_delay * 0.5)
-            _last_rate_limit_time = now
-            if _rate_limit_delay < 0.5:
-                _rate_limit_delay = 0.0
-
-        # Wait if we're in a backoff period
-        if now < _rate_limit_backoff_until:
-            wait = _rate_limit_backoff_until - now
-            print(f"[rate-limit] global backoff {wait:.1f}s", flush=True)
-            time.sleep(wait)
-
-        # Make the call
-        try:
-            return fn()
-        except Exception as e:
-            error_str = str(e)
-            if "429" in error_str or "rate_limited" in error_str.lower():
-                # Increase delay and extend backoff window
-                _rate_limit_delay = min(60, max(1, _rate_limit_delay * 1.5 or 2))
-                _rate_limit_backoff_until = time.time() + _rate_limit_delay
-                _last_rate_limit_time = time.time()
-                print(f"[rate-limit] hit 429, backing off all calls for {_rate_limit_delay:.1f}s", flush=True)
-                # Retry this specific call after the global backoff
-                time.sleep(_rate_limit_delay)
-                return fn()
-            else:
-                raise
 
     # ------------------------------------------------------------ structured
     def generate_structured(
@@ -111,7 +69,7 @@ class MistralClient:
             messages.append({"role": "user", "content": attempt_prompt})
 
             try:
-                response = self._call_with_backoff(
+                response = call_with_backoff(
                     lambda: self._client.chat.complete(
                         model=self._model,
                         messages=messages,
@@ -120,7 +78,8 @@ class MistralClient:
                             "type": "json_object",
                             "schema": json_schema,
                         },
-                    )
+                    ),
+                    provider="mistral",
                 )
                 raw = (response.choices[0].message.content or "").strip()
                 return schema.model_validate_json(raw)

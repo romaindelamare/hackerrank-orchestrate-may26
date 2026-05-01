@@ -15,6 +15,7 @@ from openai import OpenAI
 from pydantic import BaseModel, ValidationError
 
 from code.config import LLM_MAX_RETRIES, LLM_TEMPERATURE
+from code.llm.backoff import call_with_backoff
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -49,11 +50,14 @@ class OpenAIClient:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=messages,
-            temperature=LLM_TEMPERATURE,
-            max_tokens=_DEFAULT_MAX_TOKENS,
+        response = call_with_backoff(
+            lambda: self._client.chat.completions.create(
+                model=self._model,
+                messages=messages,
+                temperature=LLM_TEMPERATURE,
+                max_tokens=_DEFAULT_MAX_TOKENS,
+            ),
+            provider="openai",
         )
         return response.choices[0].message.content or ""
 
@@ -76,12 +80,15 @@ class OpenAIClient:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
-        response = self._client.beta.chat.completions.parse(
-            model=self._model,
-            messages=messages,
-            temperature=LLM_TEMPERATURE,
-            max_tokens=_DEFAULT_MAX_TOKENS,
-            response_format=schema,
+        response = call_with_backoff(
+            lambda: self._client.beta.chat.completions.parse(
+                model=self._model,
+                messages=messages,
+                temperature=LLM_TEMPERATURE,
+                max_tokens=_DEFAULT_MAX_TOKENS,
+                response_format=schema,
+            ),
+            provider="openai",
         )
         return response.choices[0].message.parsed
 
@@ -104,12 +111,15 @@ class OpenAIClient:
             messages.append({"role": "user", "content": attempt_prompt})
 
             try:
-                response = self._client.chat.completions.create(
-                    model=self._model,
-                    messages=messages,
-                    temperature=LLM_TEMPERATURE,
-                    max_tokens=_DEFAULT_MAX_TOKENS,
-                    response_format={"type": "json_object"},
+                response = call_with_backoff(
+                    lambda: self._client.chat.completions.create(
+                        model=self._model,
+                        messages=messages,
+                        temperature=LLM_TEMPERATURE,
+                        max_tokens=_DEFAULT_MAX_TOKENS,
+                        response_format={"type": "json_object"},
+                    ),
+                    provider="openai",
                 )
                 raw = (response.choices[0].message.content or "").strip()
                 return schema.model_validate_json(raw)
