@@ -15,7 +15,7 @@ from typing import Type, TypeVar
 from mistralai.client import Mistral
 from pydantic import BaseModel, ValidationError
 
-from code.config import MISTRAL_MODEL, LLM_MAX_RETRIES, LLM_TEMPERATURE
+from code.config import LLM_MAX_RETRIES, LLM_TEMPERATURE
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -28,7 +28,7 @@ _last_rate_limit_time = 0.0
 class MistralClient:
     """Thin Mistral wrapper that returns text or schema-validated objects."""
 
-    def __init__(self, *, model: str = MISTRAL_MODEL, api_key: str | None = None) -> None:
+    def __init__(self, *, model: str = "mistral-small-latest", api_key: str | None = None) -> None:
         key = api_key or os.environ.get("MISTRAL_API_KEY")
         if not key:
             raise RuntimeError(

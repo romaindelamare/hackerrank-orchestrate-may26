@@ -8,6 +8,7 @@ from any working directory.
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 REPO_ROOT: Path = Path(__file__).resolve().parent.parent
@@ -18,9 +19,41 @@ INPUT_CSV: Path = TICKETS_DIR / "support_tickets.csv"
 OUTPUT_CSV: Path = TICKETS_DIR / "output.csv"
 CHROMA_DIR: Path = CODE_DIR / "chroma_db"
 
-MISTRAL_MODEL: str = "mistral-small-latest"
 EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
 COLLECTION_NAME: str = "support_docs"
+
+
+@dataclass
+class LLMConfig:
+    """Provider + model selector for a single node or agent.
+
+    Supported providers: "mistral", "anthropic", "openai"
+    """
+    provider: str
+    model: str
+
+
+# ---------------------------------------------------------------------------
+# Per-node LLM configuration
+# ---------------------------------------------------------------------------
+# Classify: lightweight structured extraction — small/fast model is fine.
+CLASSIFY_LLM = LLMConfig(provider="mistral", model="mistral-small-latest")
+
+# Reply: grounded answer generation — benefits from a capable model.
+REPLY_LLM = LLMConfig(provider="mistral", model="mistral-small-latest")
+
+# Escalate: empathetic message composition — small model sufficient.
+ESCALATE_LLM = LLMConfig(provider="mistral", model="mistral-small-latest")
+
+# Reviewer: meta-reasoning quality gate — use a stronger model for better catches.
+REVIEWER_LLM = LLMConfig(provider="mistral", model="mistral-large-latest")
+
+# Optimal configuration
+# CLASSIFY_LLM  = LLMConfig(provider="mistral",   model="mistral-small-latest")
+# REPLY_LLM     = LLMConfig(provider="anthropic", model="claude-sonnet-4-6")
+# ESCALATE_LLM  = LLMConfig(provider="mistral",   model="mistral-small-latest")
+# REVIEWER_LLM  = LLMConfig(provider="anthropic", model="claude-haiku-4-5-20251001")
+
 
 RETRIEVAL_TOP_K: int = 8
 LLM_TEMPERATURE: float = 0.0

@@ -29,16 +29,23 @@ from code.retrieval.interfaces import IRetriever
 from code.schemas.state import TicketState
 
 
-def build_graph(llm: ILLMClient, retriever: IRetriever):
+def build_graph(
+    retriever: IRetriever,
+    *,
+    classify_llm: ILLMClient,
+    reply_llm: ILLMClient,
+    escalate_llm: ILLMClient,
+):
     """Wire nodes + edges and return a compiled graph.
 
-    Dependencies are injected here, the single composition root.
-    Nodes themselves never instantiate their collaborators.
+    Each LLM-backed node receives its own client so provider and model can
+    be configured independently in config.py (CLASSIFY_LLM, REPLY_LLM,
+    ESCALATE_LLM).
     """
-    classify = ClassifyNode(llm)
+    classify = ClassifyNode(classify_llm)
     retrieve = RetrieveNode(retriever)
-    reply = ReplyNode(llm)
-    escalate = EscalateNode(llm)
+    reply = ReplyNode(reply_llm)
+    escalate = EscalateNode(escalate_llm)
     fmt = FormatOutputNode()
 
     g = StateGraph(TicketState)

@@ -46,10 +46,14 @@ from code.config import (
     INPUT_CSV,
     OUTPUT_CSV,
     REPO_ROOT,
+    CLASSIFY_LLM,
+    REPLY_LLM,
+    ESCALATE_LLM,
+    REVIEWER_LLM,
 )
 from code.agents.triage import build_graph
 from code.agents.reviewer import build_reviewer_graph
-from code.llm.mistral_client import MistralClient
+from code.llm.factory import create_llm_client
 from code.retrieval.indexer import build_index, collection_size
 from code.retrieval.retriever import ChromaRetriever
 from code.schemas.ticket import TicketInput
@@ -253,10 +257,21 @@ def main() -> int:
         _ensure_index(args.reindex)
 
         print("[graph] wiring dependencies ...", flush=True)
-        llm = MistralClient()
+        print(
+            f"[llm] classify={CLASSIFY_LLM.provider}/{CLASSIFY_LLM.model} "
+            f"reply={REPLY_LLM.provider}/{REPLY_LLM.model} "
+            f"escalate={ESCALATE_LLM.provider}/{ESCALATE_LLM.model} "
+            f"reviewer={REVIEWER_LLM.provider}/{REVIEWER_LLM.model}",
+            flush=True,
+        )
         retriever = ChromaRetriever()
-        graph = build_graph(llm, retriever)
-        reviewer = build_reviewer_graph(llm)
+        graph = build_graph(
+            retriever,
+            classify_llm=create_llm_client(CLASSIFY_LLM),
+            reply_llm=create_llm_client(REPLY_LLM),
+            escalate_llm=create_llm_client(ESCALATE_LLM),
+        )
+        reviewer = build_reviewer_graph(create_llm_client(REVIEWER_LLM))
         cache = SemanticCache()
 
         if args.reset_cache:
