@@ -61,7 +61,7 @@ code/
 ├── README.md                 # this file
 ├── requirements.txt          # pinned deps
 ├── .env.example              # copy to .env, set provider API keys
-├── main.py                   # entry point (composition root)
+├── main.py                   # entry point (setup & orchestration)
 ├── config.py                 # paths, per-node LLM configs, escalation triggers
 │
 ├── schemas/
@@ -102,6 +102,13 @@ code/
 │
 ├── cache/
 │   └── semantic_cache.py     # ChromaDB-backed semantic cache for LLM responses
+│
+├── processing/               # Batch processing orchestration
+│   ├── __init__.py           # public API (run_batch, print_recap, BatchResult)
+│   ├── result.py             # BatchResult dataclass (rows + counters)
+│   ├── ticket.py             # process_ticket(), build_output_row() (single-ticket ops)
+│   ├── batch.py              # run_batch() (batch loop orchestration)
+│   └── output.py             # print_recap() (ANSI-formatted output)
 │
 └── utils/
     └── agent_logger.py       # AGENTS.md §5 log writer
@@ -226,6 +233,21 @@ The escalation message is empathetic but never promises specific outcomes (refun
 ## Swapping providers or vector stores
 
 Because nodes depend on `ILLMClient` and `IRetriever`, replacing any LLM provider — or ChromaDB with another vector store — is one new class plus one `LLMConfig` line in `config.py`. No node code changes.
+
+---
+
+## Batch processing pipeline (`processing/`)
+
+The `processing/` submodule handles the batch CSV workflow — one focused responsibility per file:
+
+| Module | Purpose |
+|---|---|
+| `result.py` | `BatchResult` dataclass: rows + status/request/company/reviewer counters |
+| `ticket.py` | Single-ticket ops: cache lookup, graph invocation, error handling, row building |
+| `batch.py` | Orchestration: iterates all rows, updates counters, prints progress |
+| `output.py` | Recap formatting: ANSI colors, progress bars, metrics display |
+
+**Entry point:** `main.py` parses args, sets up dependencies (index, graph, cache), then calls `run_batch(df, graph, reviewer, cache)` and `print_recap(...)`. The batch processing logic is decoupled and testable in isolation.
 
 ---
 
